@@ -1,15 +1,16 @@
 #include <algorithm>
-#include <config.h>
+#include <nix/expr/config.hh>
+#include <nix/util/configuration.hh>
 #include <dlfcn.h>
-#include <eval-inline.hh>
-#include <globals.hh>
+#include <nix/expr/eval-inline.hh>
+#include <nix/store/globals.hh>
 #include <iostream>
 #include <iterator>
 #include <optional>
-#include <primops.hh>
+#include <nix/expr/primops.hh>
 #include <string_view>
 
-#if HAVE_BOEHMGC
+#if NIX_HAVE_BOEHMGC
 
 #include <gc/gc.h>
 #include <gc/gc_cpp.h>
