@@ -59,7 +59,7 @@ fn main() {
     let major: u32 = parts.next().unwrap().unwrap();
     let minor = parts.next().unwrap().unwrap();
 
-    let mut cpp_version = "20";
+    let mut cpp_version = "23";
 
     if (major, minor) <= (2, 11) {
         cpp_version = "17";
