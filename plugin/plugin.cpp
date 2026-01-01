@@ -122,7 +122,7 @@ public:
 
   bool isVerbose() override { return upstream->isVerbose(); }
 
-  void log(Verbosity lvl, const FormatOrString &fs) override {
+  void log(Verbosity lvl, std::string_view fs) override {
     upstream->log(lvl, fs);
   }
 
