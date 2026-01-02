@@ -111,12 +111,13 @@ static auto unwrapVectorToFfiFields(std::vector<FfiField> const &fields_)
 
 class OTelLogger : public Logger {
 private:
-  Logger *upstream;
   Context const *m_context;
 
 public:
-  OTelLogger(Logger *upstream, Context const *context)
-      : upstream(upstream), m_context(context) {}
+  std::unique_ptr<Logger> upstream;
+
+  OTelLogger(std::unique_ptr<Logger> upstream, Context const *context)
+      : m_context(context), upstream(std::move(upstream)) {}
   ~OTelLogger() = default;
 
   void stop() override { upstream->stop(); }
@@ -163,20 +164,27 @@ public:
 
 class PluginInstance {
   Context *context;
-  Logger *oldLogger;
 
 public:
   PluginInstance() {
-    Logger *oldLogger = logger;
     context = initialize_plugin();
-    logger = new OTelLogger(oldLogger, context);
+    logger = std::unique_ptr<Logger>(new OTelLogger(std::move(logger), context));
   }
 
   ~PluginInstance() {
-    auto toDestroy = logger;
-    logger = oldLogger;
+    // get the OTelLogger wrapper we setup, and then set
+    // the global logger to the one that it wrapped around,
+    // which ensures that we don't "leave any trace" and
+    // the runtime is back to its pre-plugin form.
+    // (note: this also assumes that nothing wrapped the
+    // logger after we did or that it unwrapped it before
+    // we get destroyed...)
+    auto toDestroy = std::move(logger);
+    logger = std::move((static_cast<OTelLogger&>(*toDestroy)).upstream);
+
     deinitialize_plugin(context);
-    delete toDestroy;
+
+    toDestroy.reset();
   }
 };
 
