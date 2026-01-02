@@ -111,25 +111,25 @@ static auto unwrapVectorToFfiFields(std::vector<FfiField> const &fields_)
 
 class OTelLogger : public Logger {
 private:
-  std::unique_ptr<Logger> *upstream;
+  Logger *upstream;
   Context const *m_context;
 
 public:
-  OTelLogger(std::unique_ptr<Logger> *upstream, Context const *context)
+  OTelLogger(Logger *upstream, Context const *context)
       : upstream(upstream), m_context(context) {}
   ~OTelLogger() = default;
 
-  void stop() override { (*upstream)->stop(); }
+  void stop() override { upstream->stop(); }
 
-  bool isVerbose() override { return (*upstream)->isVerbose(); }
+  bool isVerbose() override { return upstream->isVerbose(); }
 
   void log(Verbosity lvl, std::string_view fs) override {
-    (*upstream)->log(lvl, fs);
+    upstream->log(lvl, fs);
   }
 
-  void logEI(const ErrorInfo &ei) override { (*upstream)->logEI(ei); }
+  void logEI(const ErrorInfo &ei) override { upstream->logEI(ei); }
 
-  void warn(const std::string &msg) override { (*upstream)->log(msg); }
+  void warn(const std::string &msg) override { upstream->log(msg); }
 
   void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
                      const std::string &s, const Fields &fields,
@@ -137,46 +137,46 @@ public:
     auto fields_ = marshalFields(fields);
     start_activity(m_context, act, marshalActivityType(type), s.c_str(),
                    unwrapVectorToFfiFields(fields_), parent);
-    (*upstream)->startActivity(act, lvl, type, s, fields, parent);
+    upstream->startActivity(act, lvl, type, s, fields, parent);
   };
 
   void stopActivity(ActivityId act) override {
     end_activity(m_context, act);
-    (*upstream)->stopActivity(act);
+    upstream->stopActivity(act);
   };
 
   void result(ActivityId act, ResultType type, const Fields &fields) override {
     auto fields_ = marshalFields(fields);
     on_result(m_context, act, marshalResultType(type),
               unwrapVectorToFfiFields(fields_));
-    (*upstream)->result(act, type, fields);
+    upstream->result(act, type, fields);
   };
 
   void writeToStdout(std::string_view s) override {
-    (*upstream)->writeToStdout(s);
+    upstream->writeToStdout(s);
   }
 
   std::optional<char> ask(std::string_view s) override {
-    return (*upstream)->ask(s);
+    return upstream->ask(s);
   }
 };
 
 class PluginInstance {
   Context *context;
-  std::unique_ptr<Logger> *oldLogger;
+  Logger *oldLogger;
 
 public:
   PluginInstance() {
-    std::unique_ptr<Logger> *oldLogger = &logger;
+    Logger *oldLogger = logger;
     context = initialize_plugin();
-    logger = std::unique_ptr<Logger>(new OTelLogger(oldLogger, context));
+    logger = new OTelLogger(oldLogger, context);
   }
 
   ~PluginInstance() {
-    auto toDestroy = std::move(logger);
-    logger = std::move(*oldLogger);
+    auto toDestroy = logger;
+    logger = oldLogger;
     deinitialize_plugin(context);
-    toDestroy.reset();
+    delete toDestroy;
   }
 };
 
