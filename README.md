@@ -1,5 +1,33 @@
 # nix-otel
 
+> [!NOTE]
+> This is small fork from [jade's original `nix-otel`](https://github.com/lf-/nix-otel),
+> to update the code for the at-the-time-of-writing latest CppNix version
+> (2.31.2+1); I know neither Rust nor C++, let alone the Nix ABI/API, so it's
+> very possible I did some of this wrong, but you're very welcome to open
+> PRs or issues.
+>
+> This is packaged into a derivation (defined in `default.nix`), which will
+> contain the library/plugin in the `lib/` folder; you can thus load the plugin
+> by appending the `--option plugin-files ${nix-otel}/lib/libnix_otel_plugin.so`
+> at the very start of your command (e.g. after `nix`, or `nix-build`, etc.).
+>
+> I'm also trying to write an alternative version that can work for Lix (since
+> that's the nix implementation I daily-drive), but Lix's `Logger` interface has
+> quite a few changes that make this a little harder to implement, so no
+> promises.
+>
+> For convenience, I've written a custom `shell.nix` that allows you to spawn a
+> `nix-shell` containing a wrapper (named `nix-with-otel`) for the `nix` command
+> that automatically uses the plugin. To be clear, this is meant for the "nix3"
+> (aka `nix-command`) CLI, like `nix build` or `nix shell`; for the older
+> interface, there is a wrapper (named `nix-build-otel`) for the `nix-build`
+> command, and you can easily write your own wrapper for other commands if you
+> want to.
+
+> [!WARNING]
+> Original README below
+
 ![Screenshot of Honeycomb from nix-otel instrumenting building itself](./demo-screenshot.png)
 
 This program shims the Nix logger with a Nix plugin to extract precise timing

@@ -3,8 +3,6 @@
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
-    #zoeee.url = "git+file:///home/blokyk/dev/shoppe/packages.nix";
-    #zoeee.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = { self, nixpkgs, flake-utils }:
@@ -48,35 +46,9 @@
       )
     // {
       overlays.default = (
-        final: prev:
-          let
-            inherit (prev) lib;
-          in
-          {
-            nix-otel = final.rustPlatform.buildRustPackage {
-              pname = "nix-otel";
-              version = "0.1.0";
-
-              cargoLock = {
-                lockFile = ./Cargo.lock;
-              };
-
-              src = ./.;
-
-              # tools on the builder machine needed to build; e.g. pkg-config
-              nativeBuildInputs = with final; [
-                pkg-config
-                protobuf
-              ];
-
-              # native libs
-              buildInputs = with final; [
-                boost
-                nix
-              ] ++ lib.optional final.stdenv.isDarwin
-                final.darwin.apple_sdk.frameworks.Security;
-            };
-          }
+        final: prev: {
+          nix-otel = final.callPackage ./default.nix {};
+        }
       );
     };
 }
