@@ -83,7 +83,7 @@ pub unsafe fn unmarshal_string(s: &FfiString) -> String {
 pub unsafe fn unmarshal_field(field: &FfiField) -> Field {
     match field {
         FfiField::String(s) => Field::String(unsafe { unmarshal_string(s) }),
-        FfiField::Num(n) => (Field::Num(*n)),
+        FfiField::Num(n) => Field::Num(*n),
     }
 }
 

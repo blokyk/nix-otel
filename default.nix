@@ -34,8 +34,7 @@
   nativeBuildInputs = [
     pkg-config
     protobuf
-    nix
-    # debugLix
+    debugLix
 
     bear
     rust-cbindgen
@@ -43,8 +42,7 @@
 
   buildInputs = [
     boost
-    nix
-    # debugLix
+    debugLix
     capnproto
   ];
 

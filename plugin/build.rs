@@ -42,15 +42,15 @@ fn main() {
     println!("cargo:rerun-if-changed=plugin.cpp");
     let nix_expr = pkg_config::Config::new()
         .atleast_version("2.1.1")
-        .probe("nix-expr")
+        .probe("lix-expr")
         .unwrap();
     let nix_store = pkg_config::Config::new()
         .atleast_version("2.1.1")
-        .probe("nix-store")
+        .probe("lix-store")
         .unwrap();
     let nix_main = pkg_config::Config::new()
         .atleast_version("2.1.1")
-        .probe("nix-main")
+        .probe("lix-main")
         .unwrap();
 
     let nix_ver = nix_expr.version.clone();
@@ -69,7 +69,8 @@ fn main() {
     let mut build = cc::Build::new();
     build
         .cpp(true)
-        .opt_level(2)
+        // .opt_level(2)
+        .flag("-Og").flag("-g")
         .shared_flag(true)
         .flag(&format!("-std=c++{}", cpp_version))
         .add_pkg_config(nix_expr)

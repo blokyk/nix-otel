@@ -1,14 +1,19 @@
 #include <algorithm>
-#include <nix/expr/config.hh>
-#include <nix/util/configuration.hh>
 #include <dlfcn.h>
-#include <nix/expr/eval-inline.hh>
-#include <nix/store/globals.hh>
 #include <iostream>
 #include <iterator>
 #include <optional>
-#include <nix/expr/primops.hh>
 #include <string_view>
+
+#include <kj/async.h>
+
+#include <lix/config.h>
+#include <lix/libutil/config.hh>
+#include <lix/libutil/logging.hh>
+//#include <lix/libutil/configuration.hh>
+#include <lix/libexpr/eval-inline.hh>
+#include <lix/libstore/globals.hh>
+#include <lix/libexpr/primops.hh>
 
 #if NIX_HAVE_BOEHMGC
 
@@ -114,43 +119,52 @@ private:
   Context const *m_context;
 
 public:
-  std::unique_ptr<Logger> upstream;
+  Logger *upstream;
 
-  OTelLogger(std::unique_ptr<Logger> upstream, Context const *context)
-      : m_context(context), upstream(std::move(upstream)) {}
+  OTelLogger(Logger *upstream, Context const *context)
+      : m_context(context), upstream(upstream) {}
   ~OTelLogger() = default;
 
-  void stop() override { upstream->stop(); }
+  void pause() override { upstream->pause(); }
+  void resetProgress() override { upstream->resetProgress(); }
+  void resume() override { upstream->resume(); }
 
   bool isVerbose() override { return upstream->isVerbose(); }
 
-  void log(Verbosity lvl, std::string_view fs) override {
-    upstream->log(lvl, fs);
+  BufferState bufferState() const override {
+    if (upstream->bufferState() == BufferState::NeedsFlush)
+      return BufferState::NeedsFlush;
+
+    return BufferState::HasSpace;
   }
 
-  void logEI(const ErrorInfo &ei) override { upstream->logEI(ei); }
+  BufferState log(Verbosity lvl, std::string_view fs) override {
+    return upstream->log(lvl, fs);
+  }
 
-  void warn(const std::string &msg) override { upstream->log(msg); }
+  BufferState logEI(const ErrorInfo &ei) override {
+    return upstream->logEI(ei);
+  }
 
-  void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
+  BufferState startActivityImpl(ActivityId act, Verbosity lvl, ActivityType type,
                      const std::string &s, const Fields &fields,
                      ActivityId parent) override {
     auto fields_ = marshalFields(fields);
     start_activity(m_context, act, marshalActivityType(type), s.c_str(),
                    unwrapVectorToFfiFields(fields_), parent);
-    upstream->startActivity(act, lvl, type, s, fields, parent);
+    return upstream->startActivity(act, lvl, type, s, fields, parent);
   };
 
-  void stopActivity(ActivityId act) override {
+  BufferState stopActivityImpl(ActivityId act) override {
     end_activity(m_context, act);
-    upstream->stopActivity(act);
+    return upstream->stopActivity(act);
   };
 
-  void result(ActivityId act, ResultType type, const Fields &fields) override {
+  BufferState resultImpl(ActivityId act, ResultType type, const Fields &fields) override {
     auto fields_ = marshalFields(fields);
     on_result(m_context, act, marshalResultType(type),
               unwrapVectorToFfiFields(fields_));
-    upstream->result(act, type, fields);
+    return upstream->result(act, type, fields);
   };
 
   void writeToStdout(std::string_view s) override {
@@ -160,6 +174,12 @@ public:
   std::optional<char> ask(std::string_view s) override {
     return upstream->ask(s);
   }
+
+  void waitForSpace(NeverAsync = {}) override { upstream->waitForSpace(); }
+
+  kj::Promise<Result<void>> flush() override {
+      return upstream->flush();
+  }
 };
 
 class PluginInstance {
@@ -168,7 +188,7 @@ class PluginInstance {
 public:
   PluginInstance() {
     context = initialize_plugin();
-    logger = std::unique_ptr<Logger>(new OTelLogger(std::move(logger), context));
+    logger = new OTelLogger(logger, context);
   }
 
   ~PluginInstance() {
@@ -179,12 +199,12 @@ public:
     // (note: this also assumes that nothing wrapped the
     // logger after we did or that it unwrapped it before
     // we get destroyed...)
-    auto toDestroy = std::move(logger);
-    logger = std::move((static_cast<OTelLogger&>(*toDestroy)).upstream);
+    auto toDestroy = logger;
+    logger = (dynamic_cast<OTelLogger*>(toDestroy))->upstream;
 
     deinitialize_plugin(context);
 
-    toDestroy.reset();
+    delete toDestroy;
   }
 };
 
